@@ -1,0 +1,341 @@
+# befor we start every thing we first make rest api 
+crude action (get , create , update , delete ),
+http method(GET, POST, PUT, DELET),
+endpoint(/api/contacts = for get all contacts and create contacts
+/api/contacts/:id for get contact , update contact , delete contact )
+in cmd write this cd document 
+                  mkdir express-project
+                  cd express project 
+                  mkdir mycontacts-backend
+                  cd my contacts backend 
+                  npm init (entry point = server.js , licence = MIT)
+crete .gitignore fileon the root directory and write (/node_module and .env) 
+create server.js file  and in cmd npm install express , npm i _D nodemon
+go to packegejson file under script " start":"node server.js" and "dev":"nodemon server.js" 
+to run use npm run dev 
+ open a new file called .env and write PORT = 5001 and in cmd  npm i dotenv
+in server.js use(
+    const express = require('express');
+    const dotenv = require('dotenv').config();
+    const app = express()
+    const port = process.env.PORT || 5000;
+    app.listn(port , ()=> {
+        console.log('');
+    })    use http:// localhost:5001
+)
+create a new folder to hande all route called routes folder  under it open a file called contactRouts.js
+write this under it {
+    const express = require('express');
+    const router = express.Router();
+    const { getContact, updateContact, createContact ,deleteContact,getContacts } = require('../controllers/contactControler');
+    const validateToken = require('../middleware/validateTokenHandler');
+
+
+     router.route('/').get( getContact).post(createContact);
+     router.route('/:id').get(getContacts).put(updateContact).delete(deleteContact);
+      module.exports = router;
+
+}
+then create a controllers folder & contactController.js file under it write 
+{
+    const asyncHandler = require('express-async-handler')
+    const Contact = require('../models/contactModule')
+    const getContact = asyncHandler(async(req,res) =>{
+        const contacts = await Contact.findById(req.params.id);
+        if(!contact){
+            res.status(404);
+            throw new Error('not found')
+        }
+        res.status(200).json(contacts);
+    });
+    const getContacts = asyncHandler(async(req,res) =>{
+    const contacts = await Contact.find({user_id: req.user.id});
+    res.status(200).json(contacts);
+    });
+    const createContact =asyncHandler(async (req,res) =>{
+        console.log('the request body:' , req.body);
+        const{name,email,phone} = req.body;
+        if(!name||!email||!phone){
+            res.status(400);
+            throw new Error('fill all filds');
+        }
+        const contact = await Contact.create({
+            name, email, phone,user_id:req.user.id
+        });
+        res.status(201).json(contact);
+    });
+    const updateContact = asyncHandler(async(req,res) =>{
+        const contacts = await Contact.findById(req.params.id);
+        if(!contact){
+            res.status(404);
+            throw new Error('not found');}
+            if(contact.user_id.toString()!== req.user.id){
+               res.status(403) ;
+               throw new Error('user dont have permission to update other user contact')
+            }
+     const updatedContact = await Contact.findByIdAndUpdate{
+        req.params.id,
+        req.body,
+        {new:true}
+     } ;      
+        res.status(200).json(contact);
+    });
+    const deleteContact = asyncHandler(async(req,res) =>{
+        const contacts = await Contact.findById(req.params.id);
+        if(!contact){
+            res.status(404);
+            throw new Error('not found');}
+            if(contact.user_id.toString()!== req.user.id){
+                res.status(403);
+                throw new Error('user dont have to delete other contact')
+            }
+            await Contact.deleteOne({_id:req.params.id});
+        res.status(200).json(contact);
+    });
+    module.exports = {getContact ,
+        createContact,
+        updateContact,
+        deleteContact,
+        getContacts };
+}   and in cmd npm i express-async-handler
+
+
+create a new folder called middleware and under it open errorHandler.js and write this 
+{
+    const { constants } = require("../constants");
+
+
+const errorHandler = (err , req, res ,next) => {
+    const statusCode = res.statusCode ? res.statusCode : 500;
+    switch(statusCode){
+        case constants.validation_error:
+            res.json({title:'validation error' , message: err.message , stackTrace: err.stack});
+            
+        case constants.notfound:
+            res.json({title:'not found' , message: err.message , stackTrace: err.stack});
+        case constants.forbidden:
+                res.json({title:'forbidden' , message: err.message , stackTrace: err.stack});
+        case constants.unauthorized:
+                    res.json({title:'anauthorized' , message: err.message , stackTrace: err.stack});
+        case constants.server_error:
+                        res.json({title:'server error' , message: err.message , stackTrace: err.stack});
+            default:
+                console.log('no error is found');
+                break;
+
+
+    }
+   
+};
+
+module.exports = errorHandler;
+
+}
+then open a constant.js file and write
+{
+    exports.constants = {
+        validation_error : 400,
+        unauthorized : 401,
+        forbidden:403,
+        notfound:404,
+        server_error:500,
+    
+    }   
+}
+then go to mongoDb in  website and login using my google account and use the free plan 
+and connect from my local enviroment in the overview go to the connection part and go to vscode plugin 
+in the connection in the above part copy paste the link and at the back enter the database name , add password 
+go to connect in the mongodb then go to vs driver and copy tghe link and paste the link to the env file 
+{
+    CONNECTION_STRING = the link and befor the ? we add the name of the database
+
+}
+then create a folder called config and add dbConnection.js file and install mongoose by {
+    npm i mongoose 
+}
+write this code in this file {
+    const mongoose = require('mongoose');
+    const connectDb = async()=> {
+        try{
+            const connect = await mongoose.connect(process.env.CONNECTION-STRING)
+            console.log('',connect.connection.host, connect.connection.name)
+        } catch(err){
+            console.log(err);
+            process.exit(1)
+        }
+        module.exports = connectDb;
+    }
+} then in the server.js file {
+    const express = require('ex');
+    const connectDb = require('./config/dbconnection');
+    const errorHandler= require('./middleware/errorHandler');
+    const dotenv = require('dotenv').config();
+    connectionDb();
+    const app = express()
+    app.use(express.json())
+    app.use('/api/contacts', require('./routes/contactrRoutes'));
+    app.use('/api/users', require('./routes/userRoutes'));
+    
+    
+    app.use(errorHandler);---------------
+}
+to create schema for my contact make models folder inside it make a contactModel.js file 
+inside it we can write {
+  const mongoose = require('mongoose;
+  const contactSchema = mongoose.Schema(
+    {{
+        user_id:{
+           type:mongoose.Schemachema.types.objectId,
+           required:true,
+           ref:'user' },
+        }
+        name:{
+            type : String, 
+            require:(true, 'enter contact name')
+        },
+        email:{
+            type:String,
+            require:(true, 'mvnkn')
+        },
+        timeStamps:true,
+
+    } 
+    module.exports=mongoose.model('contact', contactSchema)
+}
+
+2- authentication in the rotes folder open a file called userRoutes
+{
+    const express = require('express');
+    const {
+        currentUser,registerUser,loginUser
+    }= require('../controllers/userController');
+    const router = express.router();
+    router.post('/register', registerUser);
+    
+    router.post('/login', loginUser);
+    
+    router.get('/current', validateToken,currentUser) 
+    module.exports = router;
+}
+ then in the controller open a file which is called userController.js 
+ {   const asyncHandler = require('express-async-handler');
+     const User = require('../models/userModel');
+     const bcrypt = require('../models/useeModel');
+     const jwt = require('jsonwebtoken')
+
+
+
+    const registerUser = asyncHandler(async(req,res) =>{
+        const {username,email,password} = req.body;
+        if(!username || !email || !password){
+            res.status(400);
+            throw new Error('all fields')
+        }
+        const userAvailable = await User.findOne({email});
+        if (userAvailable) {
+            res.status(400);
+            throw new Error('user registeerd alerdy')
+        }
+        // to hash password 
+        const handlePassword = await bcrypt.hash(password,10);
+        console.log('hashed password',hashedPassword)
+        const user = await User.create({
+            username, email,password:hashedPassword,
+        });
+        console.log('user created ${user}');
+        if(user){
+            res.status(201).json({_id:user.id, email:user.email});
+        }else{
+            res.status(400):
+            throw new Error('use data not valid')
+        }
+        res.json({message : 'register user'})
+    }); 
+    const loginUser = asyncHandler(async(req,res) =>{
+        const {email,password} = req.body;
+        if(!email || !password){
+            res.status(400);
+            throw new Error('fmm')
+        }
+        const user = await User.findOne({email});
+        if(user && (await bcrypt.compare(password,user.password))){
+            const accessToken = jwt.sign({
+                user:(
+                    username:user.username,
+                    email:user.email,
+                    id:user.id,
+                ),
+             },
+            process.env.ACCESS_TOKEN_SECRETE),
+            {expiresIn: '15m'}
+            res.status(200).json({accessToken});
+        }
+         else{
+            res.status(401)
+            throw new Error('email or pass not valid')
+        };
+    
+
+    
+    const currentUser = asyncHandler(async(req,res) =>{
+        
+        res.json(req.user)
+    }); 
+    module.exports = {registerUser,loginUser,currentUser}
+ }   in the cmd install npm i bcrypt
+
+ 3- in the models folder open a new file called userModel.js{
+
+ }const mongoose = require('mongoose');
+ const userSchema = mongoose.Schema({
+    username: {
+        type:String,
+        required:[true,'add user name '],
+    },
+    email:{
+        type:String,
+        required:[true,''],
+        unique:[true, ''],
+    },
+    password:{
+        type:String,
+        required:[true,'add user passsword '], 
+    },
+ },{timeStamps:true},
+ );
+ module.export = mongoose.model('user, userSchema);
+ 5- jwt(json web token ) --- npm i jsonwebtoken 
+ in the env file {
+    ACCESS_TOKEN_SECRETE = milka...
+}
+ 4- in the moddleware folder open a file called validateTokenHandler
+   {
+    const asyncHandler = require('express-async-handler');
+    const jwt = require('jsonwebtoken');
+    const validateToken = asyncHandler(async(req,res,next)=>{
+       let token;
+       let authHeader = req.headers.Authorization || req.headers.authorization;
+       if(authHeader&& authHeader.startsWith('bearer'){
+        token = authHeader.split('')[1];
+        jwt.verify(token , process.env.ACCESS_TOKEN_SECRETE,(err,decoded))
+        if(err){
+            res.status(401);
+            throw new Error('')
+        }
+        req.user = decoded.user;
+        next();
+
+       });
+       if(token){
+        res.status(401);
+        throw new Error('')
+       }
+       module.exports = validationToken;
+
+    })
+   }
+
+
+
+
+
